@@ -1,6 +1,6 @@
 const AUTH_KEY = "acadlytics_user"
 
-export const API_URL = "http://127.0.0.1:8000"
+export const API_URL = "https://acadence-backend-zuge.onrender.com";
 
 
 export function saveAuth(authData) {
