@@ -1,6 +1,10 @@
 import { useEffect, useState } from "react"
 
-import { API_URL, getStudentId } from "../auth/auth"
+import {
+  API_URL,
+  getStudentId,
+  authFetch,
+} from "../auth/auth"
 
 
 function Marks() {
@@ -25,7 +29,7 @@ function Marks() {
       }
 
       try {
-        const response = await fetch(
+        const response = await authFetch(
           `${API_URL}/dashboard/student/${studentId}`
         )
 
@@ -68,7 +72,7 @@ function Marks() {
           (item) => String(item.id) === String(courseId)
         )
 
-        const response = await fetch(
+        const response = await authFetch(
           `${API_URL}/marks/student/${studentId}/course/${courseId}`
         )
 
@@ -84,19 +88,22 @@ function Marks() {
 
         setMarks(Array.isArray(data) ? data : [])
 
-        if (course?.course_type === "Theory") {
-          const summaryResponse = await fetch(
+        if (course?.course_type?.toLowerCase() === "theory") {
+          const summaryResponse = await authFetch(
             `${API_URL}/marks/student/${studentId}/course/${courseId}/summary`
           )
 
           const summaryData = await summaryResponse.json()
 
-          if (
-            summaryResponse.ok &&
-            !summaryData.error
-          ) {
-            setSummary(summaryData)
+          if (!summaryResponse.ok || summaryData.error) {
+            throw new Error(
+              summaryData.detail ||
+              summaryData.error ||
+              "Unable to load marks summary."
+            )
           }
+
+          setSummary(summaryData)
         }
       } catch (err) {
         setError(err.message)
@@ -110,7 +117,11 @@ function Marks() {
 
 
   if (loading) {
-    return <div className="page-card">Loading marks...</div>
+    return (
+      <div className="page-card">
+        Loading marks...
+      </div>
+    )
   }
 
 
@@ -123,7 +134,10 @@ function Marks() {
         </div>
       </div>
 
-      <div className="page-card" style={{ marginBottom: "20px" }}>
+      <div
+        className="page-card"
+        style={{ marginBottom: "20px" }}
+      >
         <label
           style={{
             display: "block",
@@ -148,24 +162,34 @@ function Marks() {
           <option value="">Select course</option>
 
           {courses.map((course) => (
-            <option key={course.id} value={course.id}>
+            <option
+              key={course.id}
+              value={course.id}
+            >
               {course.course_code} — {course.course_name}
             </option>
           ))}
         </select>
       </div>
 
+
       {error && (
         <div className="page-card">
-          <p style={{ color: "#c0392b" }}>{error}</p>
+          <p style={{ color: "#c0392b" }}>
+            {error}
+          </p>
         </div>
       )}
 
+
       {courseId && marksLoading && (
-        <div className="page-card">Loading course marks...</div>
+        <div className="page-card">
+          Loading course marks...
+        </div>
       )}
 
-      {courseId && !marksLoading && (
+
+      {courseId && !marksLoading && !error && (
         <>
           {summary && (
             <div
@@ -204,9 +228,12 @@ function Marks() {
             </div>
           )}
 
+
           <div className="page-card">
             {marks.length === 0 ? (
-              <p>No marks have been entered for this course yet.</p>
+              <p>
+                No marks have been entered for this course yet.
+              </p>
             ) : (
               <div style={{ overflowX: "auto" }}>
                 <table
@@ -270,7 +297,7 @@ function SummaryCard({ title, value }) {
           fontWeight: 800,
         }}
       >
-        {value ?? 0}
+        {value ?? "—"}
       </div>
     </div>
   )
