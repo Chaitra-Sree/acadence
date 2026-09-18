@@ -10,7 +10,11 @@ import {
   YAxis,
 } from "recharts"
 
-import { API_URL, getStudentId } from "../auth/auth"
+import {
+  API_URL,
+  getStudentId,
+  authFetch,
+} from "../auth/auth"
 
 
 function Performance() {
@@ -31,25 +35,26 @@ function Performance() {
       }
 
       try {
-        const cgpaResponse = await fetch(
+        const cgpaResponse = await authFetch(
           `${API_URL}/cgpa/student/${studentId}`
         )
 
         const cgpaData = await cgpaResponse.json()
 
-        if (cgpaResponse.ok && !cgpaData.error) {
-          setCgpa(
-            cgpaData.cgpa ??
-            cgpaData.CGPA ??
-            null
+        if (!cgpaResponse.ok) {
+          throw new Error(
+            cgpaData.detail ||
+            "Unable to load performance."
           )
         }
+
+        setCgpa(cgpaData.cgpa ?? null)
 
         const rows = []
 
         for (let semester = 1; semester <= 4; semester++) {
           try {
-            const response = await fetch(
+            const response = await authFetch(
               `${API_URL}/sgpa/student/${studentId}/semester/${semester}`
             )
 
@@ -57,7 +62,7 @@ function Performance() {
 
             if (
               response.ok &&
-              !data.error &&
+              data.sgpa !== null &&
               data.sgpa !== undefined &&
               data.total_credits > 0
             ) {
@@ -67,13 +72,16 @@ function Performance() {
               })
             }
           } catch {
-            // Ignore semesters without data
+            // Semester has no available result yet.
           }
         }
 
         setSemesterData(rows)
       } catch (err) {
-        setError(err.message || "Unable to load performance.")
+        setError(
+          err.message ||
+          "Unable to load performance."
+        )
       } finally {
         setLoading(false)
       }
@@ -84,7 +92,11 @@ function Performance() {
 
 
   if (loading) {
-    return <div className="page-card">Loading performance...</div>
+    return (
+      <div className="page-card">
+        Loading performance...
+      </div>
+    )
   }
 
 
@@ -93,87 +105,100 @@ function Performance() {
       <div className="page-header">
         <div>
           <h1>Performance</h1>
-          <p>Semester-wise academic performance overview.</p>
+          <p>
+            Semester-wise academic performance overview.
+          </p>
         </div>
       </div>
 
       {error && (
         <div className="page-card">
-          <p style={{ color: "#c0392b" }}>{error}</p>
+          <p style={{ color: "#c0392b" }}>
+            {error}
+          </p>
         </div>
       )}
 
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns:
-            "repeat(auto-fit, minmax(180px, 1fr))",
-          gap: "16px",
-          marginBottom: "20px",
-        }}
-      >
-        <div className="page-card">
+      {!error && (
+        <>
           <div
             style={{
-              color: "#858794",
-              fontSize: "13px",
-              marginBottom: "8px",
+              display: "grid",
+              gridTemplateColumns:
+                "repeat(auto-fit, minmax(180px, 1fr))",
+              gap: "16px",
+              marginBottom: "20px",
             }}
           >
-            CGPA
+            <div className="page-card">
+              <div
+                style={{
+                  color: "#858794",
+                  fontSize: "13px",
+                  marginBottom: "8px",
+                }}
+              >
+                CGPA
+              </div>
+
+              <div
+                style={{
+                  fontSize: "32px",
+                  fontWeight: 800,
+                }}
+              >
+                {cgpa ?? "—"}
+              </div>
+            </div>
+
+            <div className="page-card">
+              <div
+                style={{
+                  color: "#858794",
+                  fontSize: "13px",
+                  marginBottom: "8px",
+                }}
+              >
+                Semesters with Results
+              </div>
+
+              <div
+                style={{
+                  fontSize: "32px",
+                  fontWeight: 800,
+                }}
+              >
+                {semesterData.length}
+              </div>
+            </div>
           </div>
 
-          <div
-            style={{
-              fontSize: "32px",
-              fontWeight: 800,
-            }}
-          >
-            {cgpa ?? "—"}
-          </div>
-        </div>
+          <div className="page-card">
+            <h3>SGPA Trend</h3>
 
-        <div className="page-card">
-          <div
-            style={{
-              color: "#858794",
-              fontSize: "13px",
-              marginBottom: "8px",
-            }}
-          >
-            Semesters with Results
+            {semesterData.length === 0 ? (
+              <p>No SGPA data available yet.</p>
+            ) : (
+              <div
+                style={{
+                  width: "100%",
+                  height: "330px",
+                }}
+              >
+                <ResponsiveContainer>
+                  <BarChart data={semesterData}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="semester" />
+                    <YAxis domain={[0, 10]} />
+                    <Tooltip />
+                    <Bar dataKey="sgpa" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            )}
           </div>
-
-          <div
-            style={{
-              fontSize: "32px",
-              fontWeight: 800,
-            }}
-          >
-            {semesterData.length}
-          </div>
-        </div>
-      </div>
-
-      <div className="page-card">
-        <h3>SGPA Trend</h3>
-
-        {semesterData.length === 0 ? (
-          <p>No SGPA data available yet.</p>
-        ) : (
-          <div style={{ width: "100%", height: "330px" }}>
-            <ResponsiveContainer>
-              <BarChart data={semesterData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="semester" />
-                <YAxis domain={[0, 10]} />
-                <Tooltip />
-                <Bar dataKey="sgpa" />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        )}
-      </div>
+        </>
+      )}
     </div>
   )
 }
